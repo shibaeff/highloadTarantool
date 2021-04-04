@@ -1,10 +1,6 @@
 #!/usr/bin/env tarantool
 
---
--- IProto-server
--- Should be used to distribute input requests using load balancer.
--- to run `tarantool -i server.lua <port>`. <port> should be 3301, 3302, 3303.
---
+
 json = require('json')
 
 local function getConfig(filename)
@@ -66,11 +62,35 @@ end
 
 router:route({ method = 'GET', path = '/ack' }, ack)
 
+local s = nil
+function restart(req)
+    local newPort = tostring(req:query_param("newPort"))
+    local location = tostring(req:query_param("location"))
+    local config = getConfig(location)
+    print(newPort)
+    if newPort == nil then
+        return {
+            status = 202
+        }
+    end
+    print("Halt!")
+    s:stop()
+    server = require('http.server').new('0.0.0.0', newPort)
+    server:set_router(router)
+    print("Los gehen!")
+    server:start()
+    s = server
+    return {
+        status = 200
+    }
+    end
+
+router:route({ method = 'GET', path = '/restart' }, restart)
+
 local client = require('http.client').new()
 
 local server = require('http.server').new('0.0.0.0', port)
-server:set_router(router)
-server:start()
+s = server
 
 local function all_trim(str)
     local normalisedString = string.gsub(str, "%s+", "")
@@ -78,7 +98,8 @@ local function all_trim(str)
 end
 
 function applyConfig(filename)
-    local newConfig = getConfig("config.json")
+    local newConfig = getConfig(filename)
+    print(newConfig)
     print("Starting the validation stage")
     for k, v in pairs(config) do
         if k == arg[2] then
@@ -108,4 +129,20 @@ function applyConfig(filename)
         server:set_router(router)
         server:start()
     end
+    for k, v in pairs(newConfig) do
+        client:request("GET", "localhost:" .. config[k] .. "/restart?newPort=" .. v .. "&location=filename")
+    end
+    print("Update completed")
 end
+
+local function commit()
+    applyConfig("config.json")
+    return {
+        status = 200,
+        body = "complete"
+    }
+end
+router:route({method = 'GET', path = '/commit'}, commit)
+
+server:set_router(router)
+server:start()

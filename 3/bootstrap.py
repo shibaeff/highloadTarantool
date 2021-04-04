@@ -1,7 +1,4 @@
 import json
-import os
-import sys
-import platform
 from subprocess import Popen, PIPE
 
 kwargs = {}
