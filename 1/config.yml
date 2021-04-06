@@ -2,5 +2,5 @@
 proxy:
   port: 9000
   bypass:
-    host: google.com
+    host: mail.ru
     port: 80

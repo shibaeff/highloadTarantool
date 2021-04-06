@@ -1,7 +1,7 @@
 local yaml = require('yaml')
 local fio = require('fio')
 local err
-configFile, err = fio.open("./config.yml", {'O_RDONLY'})
+configFile, err = fio.open("./config.yml", { 'O_RDONLY' })
 if not configFile then
     print('Error reading file')
     print(err)
@@ -26,14 +26,18 @@ local goalPort = tonumber(decoded['proxy']['bypass']['port'])
 local http_client = require('http.client').new({})
 local function redirect(req)
     local url = host .. ":" .. goalPort .. req:path() .. "?" .. req:query()
-    return http_client:request(req:method(), url, req.body, {
-        req:headers()
+    local headers = req:headers()
+    headers.host = host
+    resp = http_client:request(req:method(), url, req.body, {
+        headers,
+        timeout = 30
     })
+    return resp
 end
 
 local router = require('http.router').new()
-router:route({ path = '/' }, redirect)
 router:route({ path = '/.*' }, redirect)
+router:route({ path = '/' }, redirect)
 
 local server = require('http.server').new('localhost', inPort)
 server:set_router(router)
